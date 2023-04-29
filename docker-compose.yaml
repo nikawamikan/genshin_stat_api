@@ -1,0 +1,22 @@
+version: '3.8'
+
+volumes:
+  bankandb:
+
+services:
+  api:
+    build: .
+    hostname: genshin_stat_api
+    volumes:
+      - ./api:/usr/src/app:rw
+    tty: true
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
+    restart: always
+    networks:
+      - external_network
+
+
+networks:
+  external_network:
+    external:
+      name: ${NETWORK}

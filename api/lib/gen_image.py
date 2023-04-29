@@ -178,7 +178,7 @@ class GImage:
         draw = ImageDraw.Draw(im=self.__image)
         draw.text(
             xy=position,
-            text=text,
+            text=str(text),
             fill=font_color,
             font=self.__get_font(font_path=font_path, font_size=font_size),
             anchor=anchor,

@@ -1,10 +1,9 @@
 from io import BytesIO
-from discord import File
 import requests
-from lib.GImage import GImage, Colors, Algin, Anchors, ImageAnchors
+from lib.gen_image import GImage, Colors, Algin, Anchors, ImageAnchors
 from concurrent.futures import ThreadPoolExecutor, Future
 import os
-from lib.getCharacterStatus import CharacterStatus, character, artifact, weapon
+from model.enka_model import Character, Artifact, Weapon
 from PIL import Image, ImageFilter, ImageDraw
 
 
@@ -396,7 +395,7 @@ def __create_skill(skill_icon: str, skill_lv: str, charaname: str, skill_name: s
     return img.get_image()
 
 
-def __create_skill_list(character: character, element_color: tuple[int, int, int]) -> Image.Image:
+def __create_skill_list(character: Character, element_color: tuple[int, int, int]) -> Image.Image:
     """すべての天賦スキルをまとめた画像を生成します
 
     Args:
@@ -409,8 +408,7 @@ def __create_skill_list(character: character, element_color: tuple[int, int, int
     # スキル名の定義
     DATA = ["nomal", "skill", "burst"]
     charaname = character.get_dir()
-    skill_icon_list = character.skill_list_image
-    skill_lv_list = character.skill_list_level
+    skills = character.skills
 
     img = GImage(
         box_size=(600, 1000),
@@ -418,12 +416,12 @@ def __create_skill_list(character: character, element_color: tuple[int, int, int
     futures: list[Future] = []
     with ThreadPoolExecutor(max_workers=20, thread_name_prefix="__create_skill") as pool:
         # 各スキル画像の生成
-        for i in range(3):
+        for i, v in enumerate(skills):
             futures.append(
                 pool.submit(
                     __create_skill,
-                    skill_icon_list[i],
-                    skill_lv_list[i],
+                    v.icon,
+                    v.level + v.add_level,
                     charaname,
                     # 各スキル名で画像を保存します
                     f"skill_{DATA[i]}",
@@ -438,7 +436,7 @@ def __create_skill_list(character: character, element_color: tuple[int, int, int
     return img.get_image()
 
 
-def __create_artifact(artifact: artifact, angle: int, element_color: tuple[int, int, int]) -> Image.Image:
+def __create_artifact(artifact: Artifact, angle: int, element_color: tuple[int, int, int]) -> Image.Image:
     """個別の聖遺物の画像を生成します。
 
     Args:
@@ -452,9 +450,12 @@ def __create_artifact(artifact: artifact, angle: int, element_color: tuple[int, 
         box_size=(580, 140),
         default_font_size=18
     )
+    if artifact is None:
+        return base_img.get_image()
+
     # 聖遺物の背景を合成
     base_img.add_rotate_image(
-        image_path=f"Image/artifact/{artifact.ster}.png",
+        image_path=f"Image/artifact/{artifact.star}.png",
         box=(66, 70),
         size=(220, 220),
         angle=angle,
@@ -462,9 +463,9 @@ def __create_artifact(artifact: artifact, angle: int, element_color: tuple[int, 
     # 聖遺物の画像を合成
     base_img.add_image(
         image_path=__get_item_image(
-            url=artifact.image,
+            url=artifact.icon,
             type="artifacts",
-            filename=artifact.image.split("/")[-1][:-4]
+            filename=artifact.name
         ),
         size=(66, 70),
         box=(70, 70),
@@ -492,14 +493,14 @@ def __create_artifact(artifact: artifact, angle: int, element_color: tuple[int, 
         anchor=Anchors.RIGHT_DESCENDER
     )
     # 聖遺物のサブステータスを合成
-    for i in range(len(artifact.status)):
+    for i, v in enumerate(artifact.status):
         img.draw_text(
-            text=artifact.status[i][0],
+            text=v.name,
             position=(150+150*(i//2), 30*(i % 2)),
             anchor=Anchors.LEFT_ASCENDER
         )
         img.draw_text(
-            text=str(add_persent(artifact.status[i])),
+            text=v.get_status(),
             position=(275+150*(i//2), 30*(i % 2)),
             anchor=Anchors.RIGHT_ASCENDER
         )
@@ -528,7 +529,7 @@ def __create_artifact(artifact: artifact, angle: int, element_color: tuple[int, 
     return base_img.get_image()
 
 
-def __create_artifact_list(artifact_list: list[artifact], element_color: tuple[int, int, int]) -> Image.Image:
+def __create_artifact_list(artifact_map: dict[Artifact], element_color: tuple[int, int, int]) -> Image.Image:
     """聖遺物の一覧の画像を生成します。
 
     Args:
@@ -541,14 +542,15 @@ def __create_artifact_list(artifact_list: list[artifact], element_color: tuple[i
     img = GImage(
         box_size=(600, 720),
     )
+
     futures: list[Future] = []
     # 各聖遺物のステータス画像の生成
     with ThreadPoolExecutor(max_workers=20, thread_name_prefix="__create_artifact") as pool:
-        for i, v in enumerate(artifact_list):
+        for i, v in enumerate(['EQUIP_BRACER', 'EQUIP_NECKLACE', 'EQUIP_SHOES', 'EQUIP_RING', 'EQUIP_DRESS']):
             futures.append(
                 pool.submit(
                     __create_artifact,
-                    v,
+                    artifact_map.get(v),
                     144*i,
                     element_color,
                 )
@@ -561,7 +563,7 @@ def __create_artifact_list(artifact_list: list[artifact], element_color: tuple[i
     return img.get_image()
 
 
-def __create_total_socre(artifact_list: list[artifact], element_color: tuple[int, int, int, int], build_type: str) -> Image.Image:
+def __create_total_socre(artifact_list: dict[str, Artifact], element_color: tuple[int, int, int, int], build_type: str) -> Image.Image:
     """聖遺物のトータルスコアの画像を生成します
 
     Args:
@@ -572,7 +574,7 @@ def __create_total_socre(artifact_list: list[artifact], element_color: tuple[int
         Image.Image: 聖遺物のトータルスコア画像
     """
     build_type = build_type.replace(" ver2", "")
-    total_score = sum([v.score for v in artifact_list])
+    total_score = sum([v.score for v in artifact_list.values()])
     mask = Image.new(mode="L", size=(600, 50), color=0)
     draw = ImageDraw.Draw(mask)
     draw.rectangle(((30, 12), (570, 38)), fill=255)
@@ -601,7 +603,7 @@ def __create_total_socre(artifact_list: list[artifact], element_color: tuple[int
     return img
 
 
-def __create_weapon(weapon: weapon, element_color: tuple[int, int, int]) -> Image.Image:
+def __create_weapon(weapon: Weapon, element_color: tuple[int, int, int]) -> Image.Image:
     """武器画像を生成します
 
     Args:
@@ -618,9 +620,9 @@ def __create_weapon(weapon: weapon, element_color: tuple[int, int, int]) -> Imag
     # 武器画像を合成
     img.add_image(
         image_path=__get_item_image(
-            url=weapon.image,
+            url=weapon.icon,
             type="weapon",
-            filename=weapon.image.split("/")[-1][:-4]
+            filename=weapon.name
         ),
         size=(160, 160),
         box=(0, 250),
@@ -652,7 +654,7 @@ def __create_weapon(weapon: weapon, element_color: tuple[int, int, int]) -> Imag
     return img.get_image()
 
 
-def __create_image(char_data: CharacterStatus, build_type: str) -> Image.Image:
+def __create_image(character: Character) -> Image.Image:
     """キャラデータから画像を生成します。
 
     Args:
@@ -683,10 +685,9 @@ def __create_image(char_data: CharacterStatus, build_type: str) -> Image.Image:
         None: "Image/status_icon/attack.png"
     }
 
-    character = char_data.character
-    artifact = char_data.artifact
-    weapon = char_data.weapon
-    element_color = ELEMENT_COLOR[character.element]
+    artifacts = character.artifacts
+    weapon = character.weapon
+    element_color: tuple[int, int, int] = ELEMENT_COLOR[character.element]
 
     with ThreadPoolExecutor(max_workers=20, thread_name_prefix="__create") as pool:
         # 背景画像の取得
@@ -698,7 +699,7 @@ def __create_image(char_data: CharacterStatus, build_type: str) -> Image.Image:
 
         # スターとレベル、凸の画像を取得
         lvf: Future = pool.submit(
-            __create_star_and_lv, character.ster, character.level, character.constellations)
+            __create_star_and_lv, character.star, character.level, character.constellations)
 
         # ステータスを取得
         statusf: Future = pool.submit(
@@ -728,16 +729,16 @@ def __create_image(char_data: CharacterStatus, build_type: str) -> Image.Image:
         # 聖遺物画像の取得
         artifactf: Future = pool.submit(
             __create_artifact_list,
-            artifact,
+            artifacts,
             element_color
         )
 
         # 聖遺物のトータルスコアを取得
         total_scoref: Future = pool.submit(
             __create_total_socre,
-            artifact,
+            artifacts,
             element_color,
-            build_type
+            character.build_type
         )
 
         weapon_dataf: Future = pool.submit(
@@ -786,19 +787,19 @@ def __create_image(char_data: CharacterStatus, build_type: str) -> Image.Image:
     return bg.get_image()
 
 
-def get_character_discord_file(character_status: CharacterStatus, build_type: str) -> tuple[File, str]:
+def get_character_image_bytes(character_status: Character) -> bytes:
     """キャラクターステータスのオブジェクトからDiscord FileとPathを生成します。
 
     Args:
         character_status (CharacterStatus): キャラクター情報の入ったオブジェクト
 
     Returns:
-        tuple[File, str]: Discord FileとPathの入ったTuple型
+        bytes: Discord FileとPathの入ったTuple型
     """
 
-    image = __create_image(char_data=character_status, build_type=build_type)
+    image = __create_image(character_status)
+    image.show()
     fileio = BytesIO()
-    image.save(fileio, format="png")
-    fileio.seek(0)
-    filename = "status.png"
-    return (File(fileio, filename=filename), f"attachment://{filename}")
+    image = image.convert("RGB")
+    image.save(fileio, format="JPEG", optimize=True, quality=100)
+    return fileio.getvalue()
