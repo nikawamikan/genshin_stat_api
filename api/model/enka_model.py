@@ -30,6 +30,15 @@ ELEMENT_DAMAGE_TYPES = {
     "45": "岩元素ダメージ",
     "46": "氷元素ダメージ"
 }
+ELEMENT_MAP = {
+    "Fire": "40",
+    "Electric": "41",
+    "Water": "42",
+    "Grass": "43",
+    "Wind": "44",
+    "Rock": "45",
+    "Ice": "46",
+}
 
 
 def check_traveler(id: int):
@@ -266,35 +275,23 @@ def get_constellations(chara: dict):
     return constellations
 
 
-def get_elemental_name_value(json: dict):
-    elemental_list = []
-    fuga = None
+def get_elemental_name_value(id: str, json: dict):
+
     elemental_name = None
     elemental_value = None
-    # とりあえず1以上の値がダメージバフ
-    for n, fuga in ELEMENT_DAMAGE_TYPES.items():
-        if round(json["fightPropMap"][n]*100) > 0:
-            elemental_list.append(round(json["fightPropMap"][n]*100))
-            elemental_name = fuga
-            elemental_value = f'{str(round(json["fightPropMap"][n]*100 , 1))}%'
 
-    # もし0以外が2以上あったら（1以上のダメージバフが複数あったら）
-    if len([x for x in elemental_list if x != 0]) >= 2:
-        elemental_list = [x for x in elemental_list if x != 0]
-        reverse_dict = {v: k for k, v in ELEMENT_DAMAGE_TYPES.items()}
-        # 数値が同じ場合はそのキャラの元素のダメージバフを表示
-        if len(set(elemental_list)) != len(elemental_list):
-            elemental_name = CHARACTER[json["avatarId"]].element
-            elemental_value = f'{str(round(json["fightPropMap"][reverse_dict.get(elemental_name)]*100 , 1))}%'
-        # 数値が同じじゃなかったら最も高いダメージバフを表示
+    max_value = 0
+    max_key = None
+    for k in ELEMENT_DAMAGE_TYPES.keys():
+        if max_value < json["fightPropMap"][k]:
+            max_value = json["fightPropMap"][k]
+            max_key = k
+    if max_key is not None:
+        if max_value == json["fightPropMap"][ELEMENT_MAP[CHARACTER[id].element]]:
+            elemental_name = ELEMENT_DAMAGE_TYPES[ELEMENT_MAP[CHARACTER[id].element]]
         else:
-            max_value = max(elemental_list)
-            max_value_index = elemental_list.index(max_value)
-            ELEMENT_list = [{k: v} for k, v in reverse_dict.items()]
-            n = str(
-                "".join([v for k, v in ELEMENT_list[max_value_index].items()]))
-            elemental_name = ELEMENT_DAMAGE_TYPES[n]
-            elemental_value = f'{str(round(json["fightPropMap"][n]*100 , 1))}%'
+            elemental_name = ELEMENT_DAMAGE_TYPES[max_key]
+        elemental_value = f"{round(max_value*100, 1)}%"
 
     return (elemental_name, elemental_value)
 
@@ -325,7 +322,7 @@ async def get_character_status(json: dict):
     elemental_mastery = str(round(json["fightPropMap"]["28"]))
     love = int(round(json["fetterInfo"]["expLevel"]))
 
-    elemental_name, elemental_value = get_elemental_name_value(json)
+    elemental_name, elemental_value = get_elemental_name_value(id, json)
     skills = get_skills(
         id,
         json["skillLevelMap"],
