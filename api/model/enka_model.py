@@ -5,6 +5,7 @@ from model.yaml_models import get_jp_character_models, get_jp_names
 from pydantic import BaseModel
 from decimal import Decimal
 import re
+import datetime
 
 
 CHARACTER = get_jp_character_models()
@@ -29,6 +30,10 @@ ELEMENT_DAMAGE_TYPES = {
     "45": "岩元素ダメージ",
     "46": "氷元素ダメージ"
 }
+
+
+def check_traveler(id: int):
+    return id in ["10000007", "10000005"]
 
 
 async def get_json(uid: int) -> dict:
@@ -66,12 +71,14 @@ def get_score(value: Decimal, name: str, type: str):
 
 class ArtifactStatus(BaseModel):
     value: Decimal
-    score: Decimal
     name: str
     suffix: str
 
     def get_status(self):
         return f"{self.value}{self.suffix}"
+
+    def get_score(self, build_type: str):
+        return score_calc.calc(self.name, self.value, build_type)
 
 
 class Artifact(BaseModel):
@@ -81,9 +88,13 @@ class Artifact(BaseModel):
     main_value: str
     level: int
     status: list[ArtifactStatus]
-    score: Decimal
     artifact_set_name: str
     star: int
+    score: Decimal = 0.0
+
+    def calc_score(self, build_type: str) -> Decimal:
+        self.score = sum([status.get_score(build_type)
+                         for status in self.status])
 
 
 class Weapon(BaseModel):
@@ -128,19 +139,50 @@ class Character(BaseModel):
     skills: list[Skill]
     artifacts: dict[str, Artifact]
     weapon: Weapon
-    build_type: str
+    build_type: str = None
 
     def get_dir(self):
         if self.name == "旅人":
             return f"{self.name}/{self.element}"
         return self.name
 
+    def set_build_type(self, build_type: str):
+        self.build_type = build_type.replace(" ver2", "")
+        for artifact in self.artifacts.values():
+            artifact.calc_score(build_type)
 
-async def get_charcter_status(uid: str):
-    json = await get_json(uid)
+
+class UserData(BaseModel):
+    uid: int
+    nickname: str
+    create_date: str
+    char_name_map: dict[str, int]
+    characters: list[Character]
 
 
-def get_artifact(json: dict, build_type: str):
+async def get_characters(json: dict) -> list[Character]:
+    characters = [
+        await get_character_status(v) for v in json['avatarInfoList']
+    ]
+    if len(characters) == 0:
+        raise ValueError("No character data")
+
+    return characters
+
+
+async def get_user_data(json: dict) -> UserData:
+    char_list = await get_characters(json)
+    char_name_map = {c.name: i for i, c in enumerate(char_list)}
+    return UserData(
+        uid=json['uid'],
+        nickname=json['playerInfo']['nickname'],
+        create_date=datetime.datetime.now().strftime("%Y%m%d%H%M%S"),
+        char_name_map=char_name_map,
+        characters=char_list,
+    )
+
+
+def get_artifact(json: dict):
     flat = json["flat"]
     name = flat["icon"]
     icon = f'https://enka.network/ui/{flat["icon"]}.png'
@@ -153,15 +195,9 @@ def get_artifact(json: dict, build_type: str):
         ArtifactStatus(
             value=round(Decimal(v["statValue"]), 1),
             name=NAME_HASH[v["appendPropId"]],
-            score=score_calc.calc(
-                NAME_HASH[v["appendPropId"]],
-                v["statValue"],
-                build_type
-            ),
             suffix=get_suffix(NAME_HASH[v["appendPropId"]]),
         ) for v in flat["reliquarySubstats"]
     ]
-    print(flat["reliquarySubstats"])
     return Artifact(
         name=name,
         icon=icon,
@@ -171,13 +207,12 @@ def get_artifact(json: dict, build_type: str):
         level=level,
         artifact_set_name=artifact_set_name,
         status=status,
-        score=round(sum([v.score for v in status]), 1)
     )
 
 
-def get_artifacts(json: list[dict], build_type: str) -> dict[str, Artifact]:
+def get_artifacts(json: list[dict]) -> dict[str, Artifact]:
     return {
-        v["flat"]["equipType"]: get_artifact(v, build_type)
+        v["flat"]["equipType"]: get_artifact(v)
         for v in json
     }
 
@@ -188,11 +223,13 @@ def get_weapon(json: dict):
     icon = f'https://enka.network/ui/{flat["icon"]}.png'
     main_name = NAME_HASH[flat["weaponStats"][0]["appendPropId"]]
     main_value = flat["weaponStats"][0]["statValue"]
-    sub_name = NAME_HASH[flat["weaponStats"][1]["appendPropId"]]
-    sub_value = flat["weaponStats"][0]["statValue"]
+    sub_name = ""
+    sub_value = ""
+    if len(flat["weaponStats"]) == 2:
+        sub_name = NAME_HASH[flat["weaponStats"][1]["appendPropId"]]
+        sub_value = flat["weaponStats"][0]["statValue"]
     level = json["weapon"]["level"] - 1
     rank = flat["rankLevel"]
-    print(main_name, main_value, sub_name, sub_value, level, rank)
     return Weapon(
         name=name,
         icon=icon,
@@ -206,6 +243,7 @@ def get_weapon(json: dict):
 
 
 def get_skills(id: str, skill_levels: dict[str, int], extra_skill_levels: dict[str, int]):
+    print(id, CHARACTER[id].skills)
     return [
         Skill(
             name=v.name,
@@ -229,7 +267,6 @@ def get_constellations(chara: dict):
 
 
 def get_elemental_name_value(json: dict):
-
     elemental_list = []
     fuga = None
     elemental_name = None
@@ -262,8 +299,10 @@ def get_elemental_name_value(json: dict):
     return (elemental_name, elemental_value)
 
 
-async def get_character_status(json: dict, build_type: str):
+async def get_character_status(json: dict):
     id = str(json["avatarId"])
+    if check_traveler(id):
+        id = f"{id}-{json['skillDepotId']}"
     name = CHARACTER[id].name
     image = CHARACTER[id].gacha_icon_url
     element = CHARACTER[id].element
@@ -292,7 +331,7 @@ async def get_character_status(json: dict, build_type: str):
         json["skillLevelMap"],
         json["proudSkillExtraLevelMap"] if "proudSkillExtraLevelMap" in json else {}
     )
-    artifacts = get_artifacts(json["equipList"][:-1], build_type)
+    artifacts = get_artifacts(json["equipList"][:-1])
     weapon = get_weapon(json["equipList"][-1])
     return Character(
         id=id,
@@ -318,5 +357,4 @@ async def get_character_status(json: dict, build_type: str):
         skills=skills,
         artifacts=artifacts,
         weapon=weapon,
-        build_type=build_type
     )
