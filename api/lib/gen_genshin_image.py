@@ -573,7 +573,6 @@ def __create_total_socre(artifact_list: dict[str, Artifact], element_color: tupl
     Returns:
         Image.Image: 聖遺物のトータルスコア画像
     """
-    build_type = build_type.replace(" ver2", "")
     total_score = sum([v.score for v in artifact_list.values()])
     mask = Image.new(mode="L", size=(600, 50), color=0)
     draw = ImageDraw.Draw(mask)
@@ -803,3 +802,9 @@ def get_character_image_bytes(character_status: Character) -> bytes:
     image = image.convert("RGB")
     image.save(fileio, format="JPEG", optimize=True, quality=100)
     return fileio.getvalue()
+
+
+def save_image(file_path: str, character_status: Character):
+    image = __create_image(character=character_status)
+    image = image.convert("RGB")
+    image.save(file_path)
