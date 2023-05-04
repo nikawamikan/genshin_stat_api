@@ -3,3 +3,4 @@ uvicorn[standard] == 0.20.0
 Pillow == 9.3.0
 requests
 aiohttp
+ordered-set

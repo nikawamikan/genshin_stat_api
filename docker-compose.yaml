@@ -9,9 +9,12 @@ services:
     hostname: genshin_stat_api
     volumes:
       - ./api:/usr/src/app:rw
+      - ./build_images:/usr/src/app/build_images:rw
     tty: true
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
     restart: always
+    ports:
+      - 8080:80
     networks:
       - external_network
 
