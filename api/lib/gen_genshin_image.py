@@ -807,4 +807,4 @@ def get_character_image_bytes(character_status: Character) -> bytes:
 def save_image(file_path: str, character_status: Character):
     image = __create_image(character=character_status)
     image = image.convert("RGB")
-    image.save(file_path)
+    image.save(file_path, optimize=True, quality=100)
