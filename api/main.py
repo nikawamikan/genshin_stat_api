@@ -16,7 +16,10 @@ def cache_append(file_path: str):
     URL_CACHE.add(file_path)
     if len(URL_CACHE) > MAX_CACHE_SIZE:
         image_path = URL_CACHE.pop(0)
-        os.remove(image_path)
+        try:
+            os.remove(image_path)
+        except:
+            pass
 
 
 app = FastAPI()

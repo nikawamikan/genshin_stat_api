@@ -244,7 +244,6 @@ def get_weapon(json: dict):
 
 
 def get_skills(id: str, skill_levels: dict[str, int], extra_skill_levels: dict[str, int]):
-    print(id, CHARACTER[id].skills)
     return [
         Skill(
             name=v.name,
