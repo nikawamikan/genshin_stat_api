@@ -33,6 +33,7 @@ class JpCharacterModel(BaseModel):
     consts: list[str]
     skills: list[SkillModel]
     name: str
+    english_name: str
     proud_map: dict[str, str]
     quality: int
     icon_url: str
@@ -77,6 +78,8 @@ def get_jp_character_models():
                 )for v2 in v.SkillOrder
             ],
             name=jp_name[v.NameTextMapHash],
+            english_name="Player" if "Player" in chara_model[k].sideIconName[
+                NAME_SUBSTR:] else chara_model[k].sideIconName[NAME_SUBSTR:],
             icon_url=f"https://enka.network/ui/{chara_model[k].IconName}.png",
             proud_map=v.ProudMap,
             quality=5 if v.QualityType == "QUALITY_ORANGE" else 4,

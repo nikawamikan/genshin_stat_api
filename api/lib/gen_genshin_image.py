@@ -7,20 +7,6 @@ from model.enka_model import Character, Artifact, Weapon
 from PIL import Image, ImageFilter, ImageDraw
 
 
-def add_persent(status: tuple):
-    """聖遺物のタプルから値にパーセントを付けて返します
-
-    Args:
-        status (tuple): artifact.status
-
-    Returns:
-        str: value
-    """
-    if "会心" in status[0] or "チャ" in status[0] or "%" in status[0] or "元素ダメ" in status[0]:
-        return f"{status[1]}%"
-    return status[1]
-
-
 def __download_picture(url: str,  charaname: str, filename: str) -> str:
     """キャラクター名とファイル名を指定して指定の画像がない場合データをAPIから取得します
 
@@ -71,7 +57,7 @@ def __create_background(element: str, charaname: str) -> GImage:
     """
     # 元素別の画像
     img = GImage(
-        image_path=f"Image/status_bata/{element}.png",
+        image_path=f"Image/status/{element}.png",
         default_font_size=26,
     )
     # キャラ画像
@@ -79,7 +65,7 @@ def __create_background(element: str, charaname: str) -> GImage:
         image_path=f"Image/character/{charaname}/character_image.png",
     )
     # オーバーレイ画像
-    img.add_image(image_path="Image/status_bata/base.png")
+    img.add_image(image_path="Image/status/base.png")
 
     return img
 
@@ -407,7 +393,7 @@ def __create_skill_list(character: Character, element_color: tuple[int, int, int
     """
     # スキル名の定義
     DATA = ["nomal", "skill", "burst"]
-    charaname = character.get_dir()
+    path = character.get_dir()
     skills = character.skills
 
     img = GImage(
@@ -422,7 +408,7 @@ def __create_skill_list(character: Character, element_color: tuple[int, int, int
                     __create_skill,
                     v.icon,
                     v.level + v.add_level,
-                    charaname,
+                    path,
                     # 各スキル名で画像を保存します
                     f"skill_{DATA[i]}",
                     element_color
@@ -465,7 +451,7 @@ def __create_artifact(artifact: Artifact, angle: int, element_color: tuple[int, 
         image_path=__get_item_image(
             url=artifact.icon,
             type="artifacts",
-            filename=artifact.name
+            filename=artifact.icon_name
         ),
         size=(66, 70),
         box=(70, 70),
@@ -487,7 +473,7 @@ def __create_artifact(artifact: Artifact, angle: int, element_color: tuple[int, 
     )
     # 聖遺物のメインのステータスを合成
     img.draw_text(
-        text=add_persent((artifact.main_name, artifact.main_value)),
+        text=artifact.main_value+artifact.suffix,
         position=(134, 70),
         font_size=30,
         anchor=Anchors.RIGHT_DESCENDER
@@ -621,7 +607,7 @@ def __create_weapon(weapon: Weapon, element_color: tuple[int, int, int]) -> Imag
         image_path=__get_item_image(
             url=weapon.icon,
             type="weapon",
-            filename=weapon.name
+            filename=weapon.icon_name
         ),
         size=(160, 160),
         box=(0, 250),
@@ -693,7 +679,7 @@ def __create_image(character: Character) -> Image.Image:
         bgf: Future = pool.submit(
             __create_background,
             character.element,
-            character.name
+            character.english_name,
         )
 
         # スターとレベル、凸の画像を取得

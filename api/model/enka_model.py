@@ -53,21 +53,6 @@ async def get_json(uid: int) -> dict:
     return resp
 
 
-def pop_character_data(json: list, id: int) -> dict:
-    try:
-        # アバターインフォリストを回す。nにキャラ情報がすべて入る。
-        # もしキャラクター情報が公開されていない、表示できない場合はFileNotFoundErrorでraiseする。
-        for n in json['avatarInfoList']:
-            if n["avatarId"] == int(id):
-                chara = n
-                break
-            else:
-                continue
-    except:
-        raise KeyError()
-    return chara
-
-
 def get_suffix(name: str):
     if PERCENT_PATTERN.search(name):
         return "%"
@@ -91,10 +76,11 @@ class ArtifactStatus(BaseModel):
 
 
 class Artifact(BaseModel):
-    name: str
+    icon_name: str
     icon: str
     main_name: str
     main_value: str
+    suffix: str
     level: int
     status: list[ArtifactStatus]
     artifact_set_name: str
@@ -108,6 +94,7 @@ class Artifact(BaseModel):
 
 class Weapon(BaseModel):
     name: str
+    icon_name: str
     main_name: str
     main_value: str
     sub_name: str
@@ -127,6 +114,7 @@ class Skill(BaseModel):
 class Character(BaseModel):
     id: str
     name: str
+    english_name: str
     image: str
     element: str
     star: int
@@ -151,9 +139,9 @@ class Character(BaseModel):
     build_type: str = None
 
     def get_dir(self):
-        if self.name == "旅人":
-            return f"{self.name}/{self.element}"
-        return self.name
+        if self.english_name == "Player":
+            return f"{self.english_name}/{self.element}"
+        return self.english_name
 
     def set_build_type(self, build_type: str):
         self.build_type = build_type.replace(" ver2", "")
@@ -193,10 +181,11 @@ async def get_user_data(json: dict) -> UserData:
 
 def get_artifact(json: dict):
     flat = json["flat"]
-    name = flat["icon"]
+    icon_name = flat["icon"]
     icon = f'https://enka.network/ui/{flat["icon"]}.png'
     main_name = NAME_HASH[flat["reliquaryMainstat"]["mainPropId"]]
     main_value = str(flat["reliquaryMainstat"]["statValue"])
+    suffix = get_suffix(main_name)
     level = json["reliquary"]["level"] - 1
     artifact_set_name = NAME_HASH[flat["setNameTextMapHash"]]
     star = flat["rankLevel"]
@@ -208,11 +197,12 @@ def get_artifact(json: dict):
         ) for v in flat["reliquarySubstats"]
     ]
     return Artifact(
-        name=name,
+        icon_name=icon_name,
         icon=icon,
         main_name=main_name,
         star=star,
         main_value=main_value,
+        suffix=suffix,
         level=level,
         artifact_set_name=artifact_set_name,
         status=status,
@@ -229,7 +219,8 @@ def get_artifacts(json: list[dict]) -> dict[str, Artifact]:
 def get_weapon(json: dict):
     flat = json["flat"]
     name = NAME_HASH[flat["nameTextMapHash"]]
-    icon = f'https://enka.network/ui/{flat["icon"]}.png'
+    icon_name = flat["icon"]
+    icon = f'https://enka.network/ui/{icon_name}.png'
     main_name = NAME_HASH[flat["weaponStats"][0]["appendPropId"]]
     main_value = flat["weaponStats"][0]["statValue"]
     sub_name = ""
@@ -241,6 +232,7 @@ def get_weapon(json: dict):
     rank = flat["rankLevel"]
     return Weapon(
         name=name,
+        icon_name=icon_name,
         icon=icon,
         main_name=main_name,
         main_value=main_value,
@@ -301,6 +293,7 @@ async def get_character_status(json: dict):
     if check_traveler(id):
         id = f"{id}-{json['skillDepotId']}"
     name = CHARACTER[id].name
+    english_name = CHARACTER[id].english_name
     image = CHARACTER[id].gacha_icon_url
     element = CHARACTER[id].element
     star = CHARACTER[id].quality
@@ -333,6 +326,7 @@ async def get_character_status(json: dict):
     return Character(
         id=id,
         name=name,
+        english_name=english_name,
         image=image,
         element=element,
         star=star,

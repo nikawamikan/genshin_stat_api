@@ -1,5 +1,5 @@
 from lib.gen_genshin_image import save_image
-from model.enka_model import get_character_status, get_json, Character, get_user_data
+from model.enka_model import get_json, Character, get_user_data
 from fastapi.responses import FileResponse
 from fastapi import FastAPI
 from ordered_set import OrderedSet
@@ -22,18 +22,19 @@ def cache_append(file_path: str):
 app = FastAPI()
 
 
-@app.post("/{uid}_{create_date}_{char_name}_{build_type}_build.jpg")
+@app.post("/{create_date}-{uid}-{char_name}-{build_type}-{lang}.jpg")
 async def get_build(
     uid: int,
     create_date: str,
     char_name: str,
     char_stat: Character,
-    build_type: str = "atk"
+    build_type: str = "atk",
+    lang: str = "ja",
 ):
 
-    char_stat.set_build_type(score_calc.BUILD_NAMES[build_type])
-    file_path = f"./build_images/{uid}_{create_date}_{char_name}_{build_type}.jpeg"
+    file_path = f"build_images/{create_date}-{uid}-{char_name}-{build_type}-{lang}.jpg"
     if file_path not in URL_CACHE:
+        char_stat.set_build_type(score_calc.BUILD_NAMES[build_type])
         save_image(file_path=file_path, character_status=char_stat)
         cache_append(file_path=file_path)
     return FileResponse(file_path)
