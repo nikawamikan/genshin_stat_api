@@ -25,22 +25,16 @@ def cache_append(file_path: str):
 app = FastAPI()
 
 
-@app.post("/{create_date}-{uid}-{char_name}-{build_type}-{lang}.jpg")
-async def get_build(
-    uid: int,
-    create_date: str,
-    char_name: str,
-    char_stat: Character,
-    build_type: str = "atk",
-    lang: str = "ja",
-):
-
-    file_path = f"build_images/{create_date}-{uid}-{char_name}-{build_type}-{lang}.jpg"
+@app.post("/build")
+async def get_build(char_stat: Character):
+    lang = "ja"
+    filename = f"{char_stat.create_date}{char_stat.uid}{char_stat.char_name}{char_stat.build_type}{lang}.jpg"
+    file_path = f"build_images/{filename}"
     if file_path not in URL_CACHE:
-        char_stat.set_build_type(score_calc.BUILD_NAMES[build_type])
+        char_stat.set_build_type(score_calc.BUILD_NAMES[char_stat.build_type])
         save_image(file_path=file_path, character_status=char_stat)
         cache_append(file_path=file_path)
-    return FileResponse(file_path)
+    return FileResponse(file_path, filename=filename)
 
 
 @app.get("/build_types.json")
@@ -48,7 +42,7 @@ async def get_build_types():
     return CALC_TYPE_MAP
 
 
-@app.get("/{uid}.json")
+@app.get("userdata/{uid}.json")
 async def get_user_json(uid: int):
     json = await get_user_data(await get_json(uid))
     return json

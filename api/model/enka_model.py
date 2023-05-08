@@ -91,6 +91,9 @@ class Artifact(BaseModel):
         self.score = sum([status.get_score(build_type)
                          for status in self.status])
 
+    def get_status(self):
+        return f"{self.main_value}{self.suffix}"
+
 
 class Weapon(BaseModel):
     name: str
@@ -136,6 +139,8 @@ class Character(BaseModel):
     skills: list[Skill]
     artifacts: dict[str, Artifact]
     weapon: Weapon
+    uid: int
+    create_date: str
     build_type: str = None
 
     def get_dir(self):
@@ -151,29 +156,46 @@ class Character(BaseModel):
 
 class UserData(BaseModel):
     uid: int
+    level: int
+    signature: str
+    world_level: int
+    name_card_id: int
+    finish_achievement_num: int
+    tower_floor_index: int
+    tower_level_index: int
     nickname: str
     create_date: str
     char_name_map: dict[str, int]
     characters: list[Character]
 
 
-async def get_characters(json: dict) -> list[Character]:
-    characters = [
-        await get_character_status(v) for v in json['avatarInfoList']
-    ]
-    if len(characters) == 0:
-        raise ValueError("No character data")
+def get_characters(uid: int, create_date: str, json: dict) -> list[Character]:
+    if 'avatarInfoList' in json:
+        characters = [
+            await get_character_status(uid, create_date, v) for v in json['avatarInfoList']
+        ]
+    else:
+        characters = []
 
     return characters
 
 
-async def get_user_data(json: dict) -> UserData:
-    char_list = await get_characters(json)
+def get_user_data(json: dict) -> UserData:
+    uid = json['uid']
+    create_date = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    char_list = get_characters(uid, create_date, json)
     char_name_map = {c.name: i for i, c in enumerate(char_list)}
     return UserData(
         uid=json['uid'],
+        level=json['level'],
+        signature=json['signature'],
+        world_level=json['worldLevel'],
+        name_card_id=json['nameCardId'],
+        finish_achievement_num=json['finishAchievementNum'],
+        tower_floor_index=json['towerFloorIndex'],
+        tower_level_index=json['towerLevelIndex'],
         nickname=json['playerInfo']['nickname'],
-        create_date=datetime.datetime.now().strftime("%Y%m%d%H%M%S"),
+        create_date=create_date,
         char_name_map=char_name_map,
         characters=char_list,
     )
@@ -287,7 +309,7 @@ def get_elemental_name_value(id: str, json: dict):
     return (elemental_name, elemental_value)
 
 
-async def get_character_status(json: dict):
+def get_character_status(uid: int, create_date: str, json: dict):
     id = str(json["avatarId"])
     if check_traveler(id):
         id = f"{id}-{json['skillDepotId']}"
@@ -347,4 +369,6 @@ async def get_character_status(json: dict):
         skills=skills,
         artifacts=artifacts,
         weapon=weapon,
+        uid=uid,
+        create_date=create_date
     )

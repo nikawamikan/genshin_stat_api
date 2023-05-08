@@ -473,7 +473,7 @@ def __create_artifact(artifact: Artifact, angle: int, element_color: tuple[int, 
     )
     # 聖遺物のメインのステータスを合成
     img.draw_text(
-        text=artifact.main_value+artifact.suffix,
+        text=artifact.get_status(),
         position=(134, 70),
         font_size=30,
         anchor=Anchors.RIGHT_DESCENDER
