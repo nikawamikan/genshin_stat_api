@@ -28,7 +28,7 @@ app = FastAPI()
 @app.post("/build")
 async def get_build(char_stat: Character):
     lang = "ja"
-    filename = f"{char_stat.create_date}{char_stat.uid}{char_stat.char_name}{char_stat.build_type}{lang}.jpg"
+    filename = f"{char_stat.create_date}_{char_stat.uid}_{char_stat.english_name}_{char_stat.build_type}_{lang}.jpg"
     file_path = f"build_images/{filename}"
     if file_path not in URL_CACHE:
         char_stat.set_build_type(score_calc.BUILD_NAMES[char_stat.build_type])
@@ -42,7 +42,7 @@ async def get_build_types():
     return CALC_TYPE_MAP
 
 
-@app.get("userdata/{uid}.json")
+@app.get("/userdata/{uid}.json")
 async def get_user_json(uid: int):
-    json = await get_user_data(await get_json(uid))
+    json = get_user_data(await get_json(uid))
     return json

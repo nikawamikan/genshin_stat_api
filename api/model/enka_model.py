@@ -8,6 +8,16 @@ import re
 import datetime
 
 
+def none_to_empty_char(data: dict[str, str], keys: list[str]) -> str:
+    if keys[0] in data:
+        if len(keys) == 1:
+            return data[keys[0]]
+        else:
+            return none_to_empty_char(data[keys[0]], keys[1:])
+    else:
+        return ""
+
+
 CHARACTER = get_jp_character_models()
 NAME_HASH = get_jp_names()
 ELEMENT = {
@@ -69,7 +79,11 @@ class ArtifactStatus(BaseModel):
     suffix: str
 
     def get_status(self):
-        return f"{self.value}{self.suffix}"
+        if self.suffix == "":
+            value = int(self.value)
+        else:
+            value = self.value
+        return f"{value}{self.suffix}"
 
     def get_score(self, build_type: str):
         return score_calc.calc(self.name, self.value, build_type)
@@ -172,7 +186,7 @@ class UserData(BaseModel):
 def get_characters(uid: int, create_date: str, json: dict) -> list[Character]:
     if 'avatarInfoList' in json:
         characters = [
-            await get_character_status(uid, create_date, v) for v in json['avatarInfoList']
+            get_character_status(uid, create_date, v) for v in json['avatarInfoList']
         ]
     else:
         characters = []
@@ -187,13 +201,13 @@ def get_user_data(json: dict) -> UserData:
     char_name_map = {c.name: i for i, c in enumerate(char_list)}
     return UserData(
         uid=json['uid'],
-        level=json['level'],
-        signature=json['signature'],
-        world_level=json['worldLevel'],
-        name_card_id=json['nameCardId'],
-        finish_achievement_num=json['finishAchievementNum'],
-        tower_floor_index=json['towerFloorIndex'],
-        tower_level_index=json['towerLevelIndex'],
+        level=json['playerInfo']['level'],
+        signature=none_to_empty_char(json, ['playerInfo', 'signature']),
+        world_level=json['playerInfo']['worldLevel'],
+        name_card_id=json['playerInfo']['nameCardId'],
+        finish_achievement_num=json['playerInfo']['finishAchievementNum'],
+        tower_floor_index=json['playerInfo']['towerFloorIndex'],
+        tower_level_index=json['playerInfo']['towerLevelIndex'],
         nickname=json['playerInfo']['nickname'],
         create_date=create_date,
         char_name_map=char_name_map,
