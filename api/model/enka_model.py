@@ -264,7 +264,7 @@ def get_weapon(json: dict):
     if len(flat["weaponStats"]) == 2:
         sub_name = NAME_HASH[flat["weaponStats"][1]["appendPropId"]]
         sub_value = flat["weaponStats"][0]["statValue"]
-    level = json["weapon"]["level"] - 1
+    level = json["weapon"]["level"]
     rank = flat["rankLevel"]
     return Weapon(
         name=name,
